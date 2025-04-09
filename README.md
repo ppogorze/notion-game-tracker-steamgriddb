@@ -24,13 +24,15 @@ A Python CLI application to manage your game collection by connecting SteamGridD
 
 ## Installation
 
-1. Clone the repository:
+1. Create (free) Notion account and copy this [template](https://struktura.notion.site/Gry-1cfc923134f380a3b534dd19e5af239b?pvs=4)
+
+2. Clone the repository:
 ```
 git clone https://github.com/yourusername/game-collection-manager.git
 cd game-collection-manager
 ```
 
-2. Install dependencies:
+3. Install dependencies:
 ```
 pip install notion-client questionary rich requests
 ```
