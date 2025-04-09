@@ -1,5 +1,7 @@
 ![Screenshot](images/screenshot.png)
 
+[Watch video](https://github.com/ppogorze/notion-game-tracker-steamgriddb/raw/main/images/video.mp4)
+
 # Game Collection Manager
 
 A Python CLI application to manage your game collection by connecting SteamGridDB and Notion.
