@@ -1,3 +1,5 @@
+![Screenshot](images/screenshot.png)
+
 # Game Collection Manager
 
 A Python CLI application to manage your game collection by connecting SteamGridDB and Notion.
