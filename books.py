@@ -119,16 +119,10 @@ def add_book(books_service, notion_service):
 
     # Search for the book on Open Library
     try:
-        # Map language selection to ISO 639-2 code
-        language_map = {
-            "Polish": "pol",
-            "English": "eng",
-            "Any": None
-        }
-
+        # Wyszukiwanie we wszystkich językach, ale z preferencją dla polskich wyników
         search_results = books_service.search_book(
             query,
-            language=language_map[language],
+            language=None,  # Brak ograniczenia językowego
             search_type=search_type_map[search_type]
         )
 
@@ -145,6 +139,7 @@ def add_book(books_service, notion_service):
             author_text = ', '.join(authors) if authors else 'Unknown'
             published_year = book.get('first_publish_year', 'Unknown')
 
+            # Tytuł już zawiera oznaczenie języka, jeśli jest po polsku
             book_choices.append(f"{title} by {author_text} ({published_year})")
         book_choices.append("Cancel")
 

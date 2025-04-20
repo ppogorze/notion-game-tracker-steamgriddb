@@ -82,22 +82,47 @@ class OpenLibraryService:
             if "docs" in data and data["docs"]:
                 # Process and return the results
                 results = []
-                books_with_covers = []
-                books_without_covers = []
 
-                # First pass: separate books with and without covers
+                # First pass: separate books by language and cover availability
+                polish_books_with_covers = []
+                polish_books_without_covers = []
+                other_books_with_covers = []
+                other_books_without_covers = []
+
                 for book in data["docs"]:
-                    if "cover_i" in book:
-                        books_with_covers.append(book)
-                    else:
-                        books_without_covers.append(book)
+                    # Check if book has Polish language
+                    is_polish = False
+                    if "language" in book:
+                        is_polish = "pol" in book["language"]
 
-                # Process books with covers first
-                for book in books_with_covers:
+                    # Sort by language and cover availability
+                    if is_polish:
+                        if "cover_i" in book:
+                            polish_books_with_covers.append(book)
+                        else:
+                            polish_books_without_covers.append(book)
+                    else:
+                        if "cover_i" in book:
+                            other_books_with_covers.append(book)
+                        else:
+                            other_books_without_covers.append(book)
+
+                # Process books in order of preference:
+                # 1. Polish books with covers
+                # 2. Other books with covers
+                # 3. Polish books without covers
+                # 4. Other books without covers
+                for book in polish_books_with_covers:
                     results.append(self._process_search_result(book))
 
-                # Then add books without covers (up to a reasonable limit)
-                for book in books_without_covers[:20]:  # Limit to 20 books without covers
+                for book in other_books_with_covers:
+                    results.append(self._process_search_result(book))
+
+                for book in polish_books_without_covers:
+                    results.append(self._process_search_result(book))
+
+                # Limit the number of books without covers
+                for book in other_books_without_covers[:10]:  # Reduced limit for non-Polish books without covers
                     results.append(self._process_search_result(book))
 
                 return results
@@ -136,6 +161,10 @@ class OpenLibraryService:
             "publishers": book.get("publisher", []),
             "edition_count": book.get("edition_count", 0)
         }
+
+        # Dodaj informację o języku polskim w tytule, jeśli książka jest po polsku
+        if "pol" in result["languages"]:
+            result["title"] = f"{result['title']} [PL]"
 
         # Add cover URLs if available
         result["cover_urls"] = {}
