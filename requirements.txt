@@ -1,2 +1,4 @@
 questionary
 notion_client
+requests
+rich
