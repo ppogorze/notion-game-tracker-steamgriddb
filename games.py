@@ -7,7 +7,6 @@ This application helps you manage your game collection by:
 2. Adding them to your Notion database
 """
 
-import os
 import sys
 import questionary
 from rich.console import Console

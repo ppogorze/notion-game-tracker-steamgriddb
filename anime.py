@@ -7,7 +7,6 @@ This application helps you manage your anime collection by:
 2. Adding them to your Notion database
 """
 
-import os
 import sys
 import questionary
 from rich.console import Console
@@ -122,15 +121,29 @@ def add_anime(jikan_service, notion_service):
 
         console.print(f"[green]Selected: [bold]{anime_name}[/bold][/green]")
 
-        # Get anime image
-        console.print("[magenta]Retrieving anime image...[/magenta]")
-        image = jikan_service.get_anime_image(anime_id)
+        # Get detailed anime information
+        console.print("[magenta]Retrieving detailed anime information...[/magenta]")
+        anime_details = jikan_service.get_anime_full_details(anime_id)
+
+        if not anime_details:
+            console.print("[yellow]Could not retrieve detailed information for this anime.[/yellow]")
+            return
+
+        # Extract information from the details
+        image = anime_details.get("image_url")
+        episodes = anime_details.get("episodes")
+        synopsis = anime_details.get("synopsis")
+        mal_url = anime_details.get("url")
+        release_year = anime_details.get("year")
+        airing_status = anime_details.get("status")
+        seasons = anime_details.get("seasons")
+
+        # Get studio information
+        studios = anime_details.get("studios", [])
+        studio = studios[0] if studios else None
 
         # Add to Notion
         console.print("[magenta]Adding anime to Notion...[/magenta]")
-
-        # Get release year if available
-        release_year = selected_anime.get('year')
 
         # Prompt for anime status
         status_choices = [
@@ -147,17 +160,20 @@ def add_anime(jikan_service, notion_service):
             default="No Status"
         ).ask()
 
-        # Get additional information
-        episodes = selected_anime.get('episodes', 'Unknown')
-        score = selected_anime.get('score', 'Unknown')
-
-        notion_service.add_game(
+        # Use the new add_anime method
+        notion_service.add_anime(
             name=anime_name,
             icon_url=image,
             poster_url=image,
-            release_timestamp=release_year,  # This will be converted to year in NotionService
+            release_year=release_year,
             status=status,
-            platform=f"Episodes: {episodes}, Score: {score}"  # Using platform field for additional info
+            studio=studio,
+            episodes=episodes,
+            seasons=seasons,
+            airing_status=airing_status,
+            synopsis=synopsis,
+            mal_url=mal_url,
+            anidb_url=None  # AniDB URL not available from Jikan API
         )
 
         console.print(f"[green]✓ Added [bold]{anime_name}[/bold] to Notion database[/green]")
