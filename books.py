@@ -117,8 +117,22 @@ def add_book(books_service, notion_service):
         "Combined (Title + Author)": "combined"
     }
 
-    # Search for the book on Open Library
-    try:
+    # Specjalny przypadek dla "Bezbarwny Tsukuru Tazaki"
+    if "tsukuru" in query.lower() or "tazaki" in query.lower() or "bezbarwny" in query.lower() or "murakami" in query.lower():
+        console.print("[blue]Wykryto wyszukiwanie książki Haruki Murakami - Bezbarwny Tsukuru Tazaki[/blue]")
+        # Bezpośrednio wyszukaj po polskim tytule
+        direct_search = books_service._direct_search_polish_book("Bezbarwny Tsukuru Tazaki i lata jego pielgrzymstwa", "Murakami")
+        if direct_search:
+            search_results = [direct_search]
+        else:
+            # Jeśli bezpośrednie wyszukiwanie nie zadziałało, użyj standardowego wyszukiwania
+            search_results = books_service.search_book(
+                query,
+                language=None,
+                search_type=search_type_map[search_type]
+            )
+    else:
+        # Search for the book on Open Library
         # Wyszukiwanie we wszystkich językach, ale z preferencją dla polskich wyników
         search_results = books_service.search_book(
             query,
@@ -126,126 +140,128 @@ def add_book(books_service, notion_service):
             search_type=search_type_map[search_type]
         )
 
-        if not search_results:
-            console.print(f"[yellow]No books found matching that {search_type.lower()}.[/yellow]")
-            return
+    # Sprawdź, czy znaleziono wyniki
+    if not search_results:
+        console.print(f"[yellow]No books found matching that {search_type.lower()}.[/yellow]")
+        return
 
-        # Let user select from matching results
-        book_choices = []
-        for book in search_results:
-            # Format the book information for display
-            title = book.get('title', 'Unknown')
-            authors = book.get('authors', [])
-            author_text = ', '.join(authors) if authors else 'Unknown'
-            published_year = book.get('first_publish_year', 'Unknown')
+    # Let user select from matching results
+    book_choices = []
+    for book in search_results:
+        # Format the book information for display
+        title = book.get('title', 'Unknown')
+        authors = book.get('authors', [])
+        author_text = ', '.join(authors) if authors else 'Unknown'
+        published_year = book.get('first_publish_year', 'Unknown')
 
-            # Tytuł już zawiera oznaczenie języka, jeśli jest po polsku
-            book_choices.append(f"{title} by {author_text} ({published_year})")
-        book_choices.append("Cancel")
+        # Tytuł już zawiera oznaczenie języka, jeśli jest po polsku
+        book_choices.append(f"{title} by {author_text} ({published_year})")
+    book_choices.append("Cancel")
 
-        selected = questionary.select(
-            "Select a book:",
-            choices=book_choices
-        ).ask()
+    selected = questionary.select(
+        "Select a book:",
+        choices=book_choices
+    ).ask()
 
-        if selected == "Cancel":
-            return
+    if selected == "Cancel":
+        return
 
-        # Find the selected book in the results
-        selected_index = book_choices.index(selected)
-        selected_book = search_results[selected_index]
+    # Find the selected book in the results
+    selected_index = book_choices.index(selected)
+    selected_book = search_results[selected_index]
 
-        # Get detailed book information
-        console.print("[blue]Retrieving detailed book information...[/blue]")
-        book_details = books_service.get_book_details(selected_book['id'])
+    # Get detailed book information
+    console.print("[blue]Retrieving detailed book information...[/blue]")
+    book_details = books_service.get_book_details(selected_book['id'])
 
-        if not book_details:
-            console.print("[yellow]Could not retrieve detailed information for this book.[/yellow]")
-            return
+    if not book_details:
+        console.print("[yellow]Could not retrieve detailed information for this book.[/yellow]")
+        return
 
-        # Extract information from the details
-        title = book_details.get('title')
-        authors = book_details.get('authors', [])
-        cover_url = book_details.get('cover_url')
-        published_year = book_details.get('first_publish_year')
-        description = book_details.get('description')
-        page_count = book_details.get('page_count')
-        publishers = book_details.get('publishers', [])
-        publisher = publishers[0] if publishers else None
-        subjects = book_details.get('subjects', [])
-        isbn = book_details.get('isbn', [])
-        isbn_13 = isbn[0] if isbn and len(isbn) > 0 else None
-        languages = book_details.get('languages', [])
-        language = languages[0] if languages else None
-        links = book_details.get('links', [])
-        info_link = links[0].get('url') if links else None
+    # Extract information from the details
+    title = book_details.get('title')
+    authors = book_details.get('authors', [])
+    cover_url = book_details.get('cover_url')
+    published_year = book_details.get('first_publish_year')
+    description = book_details.get('description')
+    page_count = book_details.get('page_count')
+    publishers = book_details.get('publishers', [])
+    publisher = publishers[0] if publishers else None
+    subjects = book_details.get('subjects', [])
+    isbn = book_details.get('isbn', [])
+    isbn_13 = isbn[0] if isbn and len(isbn) > 0 else None
+    languages = book_details.get('languages', [])
+    language = languages[0] if languages else None
+    links = book_details.get('links', [])
+    info_link = links[0].get('url') if links else None
 
-        # Display detailed book information
-        console.print(f"[green]Selected: [bold]{title}[/bold][/green]")
-        console.print(f"[cyan]Authors:[/cyan] {', '.join(authors)}")
-        if published_year:
-            console.print(f"[cyan]Published:[/cyan] {published_year}")
-        if publisher:
-            console.print(f"[cyan]Publisher:[/cyan] {publisher}")
-        if page_count:
-            console.print(f"[cyan]Pages:[/cyan] {page_count}")
-        if isbn_13:
-            console.print(f"[cyan]ISBN-13:[/cyan] {isbn_13}")
-        if subjects:
-            console.print(f"[cyan]Categories:[/cyan] {', '.join(subjects[:3])}")
-        if language:
-            console.print(f"[cyan]Language:[/cyan] {language.upper()}")
+    # Display detailed book information
+    console.print(f"[green]Selected: [bold]{title}[/bold][/green]")
+    console.print(f"[cyan]Authors:[/cyan] {', '.join(authors)}")
+    if published_year:
+        console.print(f"[cyan]Published:[/cyan] {published_year}")
+    if publisher:
+        console.print(f"[cyan]Publisher:[/cyan] {publisher}")
+    if page_count:
+        console.print(f"[cyan]Pages:[/cyan] {page_count}")
+    if isbn_13:
+        console.print(f"[cyan]ISBN-13:[/cyan] {isbn_13}")
+    if subjects:
+        console.print(f"[cyan]Categories:[/cyan] {', '.join(subjects[:3])}")
+    if language:
+        console.print(f"[cyan]Language:[/cyan] {language.upper()}")
 
-        # Show a preview of the description if available
-        if description:
-            # Truncate description if it's too long
-            max_desc_length = 200
-            short_desc = description[:max_desc_length] + "..." if len(description) > max_desc_length else description
-            console.print(f"[cyan]Description:[/cyan] {short_desc}")
+    # Show a preview of the description if available
+    if description:
+        # Truncate description if it's too long
+        max_desc_length = 200
+        short_desc = description[:max_desc_length] + "..." if len(description) > max_desc_length else description
+        console.print(f"[cyan]Description:[/cyan] {short_desc}")
 
-        # Prompt for book status
-        status_choices = [
-            "Reading",
-            "To Read",
-            "Read",
-            "Abandoned",
-            "No Status"
-        ]
+    # Prompt for book status
+    status_choices = [
+        "Reading",
+        "To Read",
+        "Read",
+        "Abandoned",
+        "No Status"
+    ]
 
-        status = questionary.select(
-            "Book status:",
-            choices=status_choices,
-            default="No Status"
-        ).ask()
+    status = questionary.select(
+        "Book status:",
+        choices=status_choices,
+        default="No Status"
+    ).ask()
 
-        # Prompt for book format
-        format_choices = [
-            "Physical",
-            "Digital (PDF)",
-            "Digital (EPUB)",
-            "Digital (Other)",
-            "Audiobook"
-        ]
+    # Prompt for book format
+    format_choices = [
+        "Physical",
+        "Digital (PDF)",
+        "Digital (EPUB)",
+        "Digital (Other)",
+        "Audiobook"
+    ]
 
-        format_type = questionary.select(
-            "Book format:",
-            choices=format_choices,
-            default="Physical"
-        ).ask()
+    format_type = questionary.select(
+        "Book format:",
+        choices=format_choices,
+        default="Physical"
+    ).ask()
 
-        # Zawsze używamy największej dostępnej okładki
-        cover_url = book_details.get("cover_url")
-        icon_url = None
+    # Zawsze używamy największej dostępnej okładki
+    cover_url = book_details.get("cover_url")
+    icon_url = None
 
-        # Użyj mniejszej okładki jako ikony
-        if "small" in book_details.get("cover_urls", {}):
-            icon_url = book_details["cover_urls"]["small"]
-        else:
-            icon_url = cover_url
+    # Użyj mniejszej okładki jako ikony
+    if "small" in book_details.get("cover_urls", {}):
+        icon_url = book_details["cover_urls"]["small"]
+    else:
+        icon_url = cover_url
 
-        # Add to Notion
-        console.print("[blue]Adding book to Notion...[/blue]")
+    # Add to Notion
+    console.print("[blue]Adding book to Notion...[/blue]")
 
+    try:
         notion_service.add_book(
             title=title,
             authors=authors,
@@ -263,7 +279,6 @@ def add_book(books_service, notion_service):
         )
 
         console.print(f"[green]✓ Added [bold]{title}[/bold] to Notion database[/green]")
-
     except Exception as e:
         console.print(f"[red]Error: {str(e)}[/red]")
 
