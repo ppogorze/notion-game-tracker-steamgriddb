@@ -35,11 +35,14 @@ A Python CLI application to manage your game and anime collections by connecting
 
 - Python 3.7+
 - SteamGridDB API key (for games functionality)
-- Notion integration token and database ID
+- Notion integration token
+- Two separate Notion databases (one for games, one for anime)
 
 ## Installation
 
-1. Create (free) Notion account and copy this [template](https://struktura.notion.site/Gry-1cfc923134f380a3b534dd19e5af239b?pvs=4)
+1. Create (free) Notion account and copy these templates:
+   - [Games template](https://struktura.notion.site/Gry-1cfc923134f380a3b534dd19e5af239b?pvs=4)
+   - Create a similar template for anime with the status options: Watching, To Watch, Watched, Abandoned
 
 2. Clone the repository:
 ```
@@ -65,10 +68,11 @@ Before using the application, you need to set up your API keys:
    - Create a new integration and copy the secret token
    - Share your database with the integration
 
-3. **Notion Database ID**:
-   - Open your Notion database
+3. **Notion Database IDs**:
+   - Open your Games Notion database
    - Copy the URL, which contains the database ID
    - The app will extract the ID from the URL
+   - Repeat for your Anime Notion database
 
 ## Usage
 
@@ -102,14 +106,14 @@ Each application provides the following options:
 
 ### Games
 1. Run the games application: `python games.py`
-2. Select "Settings" to configure your API keys and database ID
+2. Select "Settings" to configure your API keys and database ID (separate for each application)
 3. Select "Add Game" and enter a game name
 4. Choose from the search results
 5. The game will be added to your Notion database with proper icon and cover image
 
 ### Anime
 1. Run the anime application: `python anime.py`
-2. Select "Settings" to configure your Notion integration
+2. Select "Settings" to configure your Notion integration and anime database ID
 3. Select "Add Anime" and enter an anime name
 4. Choose from the search results
 5. The anime will be added to your Notion database with proper cover image

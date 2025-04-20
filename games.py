@@ -27,28 +27,28 @@ def main():
         "[italic]Connect your games to Notion[/italic]",
         border_style="cyan"
     ))
-    
+
     # Load configuration
     config_manager = ConfigManager()
     config = config_manager.load_config()
-    
-    # Check if configuration is complete
-    if not config_manager.is_config_complete():
-        console.print("[yellow]Configuration is incomplete. Please update settings.[/yellow]")
+
+    # Check if configuration is complete for games
+    if not config_manager.is_config_complete(config_type='games'):
+        console.print("[yellow]Games configuration is incomplete. Please update settings.[/yellow]")
         if not settings_menu(config_manager):
             console.print("[red]Configuration required to continue.[/red]")
             return
-    
+
     # Initialize services with config
     # Reload config to ensure we have the latest values
     config = config_manager.load_config()
-    
+
     steam_service = SteamGridDBService(config.get('steamgriddb_api_key', ''))
     notion_service = NotionService(
         config.get('notion_token', ''),
-        config.get('notion_database_id', '')
+        config.get('games_database_id', '')
     )
-    
+
     # Main program loop
     while True:
         choice = questionary.select(
@@ -60,7 +60,7 @@ def main():
                 "Exit"
             ]
         ).ask()
-        
+
         if choice == "Add Game":
             add_game(steam_service, notion_service)
         elif choice == "View Game Library":
@@ -72,7 +72,7 @@ def main():
                 steam_service = SteamGridDBService(config.get('steamgriddb_api_key', ''))
                 notion_service = NotionService(
                     config.get('notion_token', ''),
-                    config.get('notion_database_id', '')
+                    config.get('games_database_id', '')
                 )
         elif choice == "Exit":
             console.print("[green]Goodbye![/green]")
@@ -85,17 +85,17 @@ def add_game(steam_service, notion_service):
     if not game_name:
         console.print("[yellow]Game name cannot be empty.[/yellow]")
         return
-    
+
     console.print(f"[cyan]Searching for [bold]{game_name}[/bold] on SteamGridDB...[/cyan]")
-    
+
     # Search for the game on SteamGridDB
     try:
         search_results = steam_service.search_game(game_name)
-        
+
         if not search_results:
             console.print("[yellow]No games found matching that name.[/yellow]")
             return
-        
+
         # Let user select from matching results
         game_choices = []
         for game in search_results:
@@ -109,19 +109,19 @@ def add_game(steam_service, notion_service):
                 release_text = f" ({release_info})" if release_info else ""
                 game_choices.append(f"{game['text']}{release_text}")
         game_choices.append("Cancel")
-        
+
         selected = questionary.select(
             "Select a game:",
             choices=game_choices
         ).ask()
-        
+
         if selected == "Cancel":
             return
-        
+
         # Find the selected game in the results
         selected_index = game_choices.index(selected)
         selected_game = search_results[selected_index]
-        
+
         # Get the game name and ID based on the response format
         if 'name' in selected_game:
             game_name = selected_game['name']
@@ -132,20 +132,20 @@ def add_game(steam_service, notion_service):
         else:
             console.print("[red]Error: Invalid game data format[/red]")
             return
-        
+
         console.print(f"[green]Selected: [bold]{game_name}[/bold][/green]")
-        
+
         # Get game assets (icon and poster)
         console.print("[cyan]Retrieving game assets...[/cyan]")
         icon = steam_service.get_game_icon(game_id)
         poster = steam_service.get_game_poster(game_id)
-        
+
         # Add to Notion
         console.print("[cyan]Adding game to Notion...[/cyan]")
-        
+
         # Get release timestamp if available
         release_timestamp = None
-        
+
         # Try different possible keys for the release timestamp
         for key in ['release', 'release_date']:
             if key in selected_game:
@@ -167,10 +167,10 @@ def add_game(steam_service, notion_service):
                     except Exception:
                         # If all extraction attempts fail, continue to the next key
                         pass
-        
+
         # Debug output
         console.print(f"[dim]Debug: Release timestamp extracted: {release_timestamp}[/dim]")
-        
+
         # Prompt for game status
         status_choices = [
             "Chcę zagrać",
@@ -179,13 +179,13 @@ def add_game(steam_service, notion_service):
             "Ukończone",
             "No Status"
         ]
-        
+
         status = questionary.select(
             "Game status:",
             choices=status_choices,
             default="No Status"
         ).ask()
-        
+
         # Prompt for game platform
         platform_choices = [
             "PC",
@@ -193,13 +193,13 @@ def add_game(steam_service, notion_service):
             "PS5",
             "Switch"
         ]
-        
+
         platform = questionary.select(
             "Game platform:",
             choices=platform_choices,
             default="PC"
         ).ask()
-        
+
         notion_service.add_game(
             name=game_name,
             icon_url=icon,
@@ -208,9 +208,9 @@ def add_game(steam_service, notion_service):
             status=status,
             platform=platform
         )
-        
+
         console.print(f"[green]✓ Added [bold]{game_name}[/bold] to Notion database[/green]")
-    
+
     except Exception as e:
         console.print(f"[red]Error: {str(e)}[/red]")
 
@@ -220,38 +220,39 @@ def settings_menu(config_manager):
         "[bold]Settings[/bold]",
         border_style="cyan"
     ))
-    
+
     # Load current config
     config = config_manager.load_config()
-    
+
     # Update settings
-    notion_db = questionary.text(
-        "Notion Database ID (or full URL):",
-        default=config.get('notion_database_id', '')
+    games_db = questionary.text(
+        "Games Notion Database ID (or full URL):",
+        default=config.get('games_database_id', '')
     ).ask()
-    
+
     notion_token = questionary.text(
         "Notion Integration Secret:",
         default=config.get('notion_token', '')
     ).ask()
-    
+
     steamgrid_key = questionary.text(
         "SteamGridDB API Key:",
         default=config.get('steamgriddb_api_key', '')
     ).ask()
-    
+
     # Save new settings
-    new_config = {
-        'notion_database_id': notion_db,
+    new_config = config.copy()  # Keep existing settings
+    new_config.update({
+        'games_database_id': games_db,
         'notion_token': notion_token,
         'steamgriddb_api_key': steamgrid_key
-    }
-    
+    })
+
     config_manager.save_config(new_config)
     console.print("[green]Settings saved successfully![/green]")
-    
-    # Return True if config is complete
-    return config_manager.is_config_complete()
+
+    # Return True if config is complete for games
+    return config_manager.is_config_complete(config_type='games')
 
 if __name__ == "__main__":
     try:
