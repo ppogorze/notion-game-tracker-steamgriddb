@@ -2,7 +2,6 @@
 Notion Service - Handles interaction with the Notion API
 """
 
-import re
 from urllib.parse import urlparse
 from notion_client import Client
 from rich.console import Console
@@ -797,30 +796,42 @@ class NotionService:
                 }
             }
 
-            # Add authors if provided
+            # Add authors if provided (multi-select)
             if authors:
-                author_text = ", ".join(authors) if isinstance(authors, list) else authors
+                # Convert authors to multi-select items
+                author_items = []
+                if isinstance(authors, list):
+                    for author in authors:
+                        author_items.append({"name": author})
+                else:
+                    # If it's a string, split by commas
+                    author_list = [a.strip() for a in authors.split(",")]
+                    for author in author_list:
+                        if author:  # Only add non-empty authors
+                            author_items.append({"name": author})
+
                 properties["Authors"] = {
-                    "rich_text": [
-                        {
-                            "text": {
-                                "content": author_text
-                            }
-                        }
-                    ]
+                    "multi_select": author_items
                 }
 
-            # Add published date if provided
+            # Add published date if provided (number)
             if published_date:
-                properties["Published"] = {
-                    "rich_text": [
-                        {
-                            "text": {
-                                "content": published_date
-                            }
-                        }
-                    ]
-                }
+                # Try to extract year as a number
+                try:
+                    # If it's already a number, use it directly
+                    if isinstance(published_date, int):
+                        year = published_date
+                    else:
+                        # Try to extract year from string (e.g., "2023" or "2023-05-15")
+                        year_str = str(published_date).split('-')[0].strip()
+                        year = int(year_str)
+
+                    properties["Published"] = {
+                        "number": year
+                    }
+                except (ValueError, IndexError):
+                    # If we can't extract a valid year, skip this field
+                    console.print(f"[yellow]Warning: Could not convert '{published_date}' to a year number[/yellow]")
 
             # Add status if provided
             if status:
@@ -903,10 +914,16 @@ class NotionService:
                     ]
                 }
 
-            # Add info link if provided (url)
+            # Add info link if provided (rich_text)
             if info_link:
                 properties["Info"] = {
-                    "url": info_link
+                    "rich_text": [
+                        {
+                            "text": {
+                                "content": info_link
+                            }
+                        }
+                    ]
                 }
 
             # Create the basic page

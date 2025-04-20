@@ -88,8 +88,8 @@ A Python CLI application to manage your game and anime collections by connecting
 
    ### Books Database
    - **Name** (title): Book title
-   - **Authors** (rich text): Book authors
-   - **Published** (rich text): Publication date
+   - **Authors** (multi-select): Book authors
+   - **Published** (number): Publication year
    - **Status** (multi-select): Reading status (Reading, To Read, Read, Abandoned)
    - **Format** (select): Book format (Physical, Digital (PDF), Digital (EPUB), etc.)
    - **Pages** (number): Number of pages
@@ -97,7 +97,7 @@ A Python CLI application to manage your game and anime collections by connecting
    - **Description** (rich text): Book description
    - **Categories** (multi-select): Book categories/genres
    - **ISBN** (rich text): ISBN number
-   - **Info** (url): Link to more information
+   - **Info** (rich text): Link to more information
 
 2. Clone the repository:
 ```
