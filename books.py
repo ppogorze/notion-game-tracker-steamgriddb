@@ -3,7 +3,7 @@
 Book Collection Manager CLI
 
 This application helps you manage your book collection by:
-1. Searching for books on Google Books
+1. Searching for books on Open Library
 2. Adding them to your Notion database
 """
 
@@ -12,7 +12,7 @@ import questionary
 from rich.console import Console
 from rich.panel import Panel
 
-from app.services.googlebooks import GoogleBooksService
+from app.services.openlibrary import OpenLibraryService
 from app.services.notion import NotionService
 from app.utils.config_manager import ConfigManager
 from app.utils.library_manager import library_menu
@@ -42,7 +42,7 @@ def main():
     # Reload config to ensure we have the latest values
     config = config_manager.load_config()
 
-    books_service = GoogleBooksService()
+    books_service = OpenLibraryService()
     notion_service = NotionService(
         config.get('notion_token', ''),
         config.get('books_database_id', '')
@@ -85,33 +85,50 @@ def add_book(books_service, notion_service):
             "Title",
             "Author",
             "ISBN",
-            "Any"
+            "Any",
+            "Combined (Title + Author)"
         ],
-        default="Title"
+        default="Combined (Title + Author)"
     ).ask()
 
+    # Zawsze wyszukujemy we wszystkich językach
+    language = "Any"
+
     # Get search query from user
-    query_prompt = f"Enter book {search_type.lower()}:"
+    if search_type == "Combined (Title + Author)":
+        query_prompt = "Enter search terms (title, author, etc.):"
+    else:
+        query_prompt = f"Enter book {search_type.lower()}:"
+
     query = questionary.text(query_prompt).ask()
 
     if not query:
         console.print("[yellow]Search query cannot be empty.[/yellow]")
         return
 
-    console.print(f"[blue]Searching for [bold]{query}[/bold] on Google Books...[/blue]")
+    console.print(f"[blue]Searching for [bold]{query}[/bold] on Open Library...[/blue]")
 
     # Map UI search type to API search type
     search_type_map = {
         "Title": "title",
         "Author": "author",
         "ISBN": "isbn",
-        "Any": "any"
+        "Any": "any",
+        "Combined (Title + Author)": "combined"
     }
 
-    # Search for the book on Google Books
+    # Search for the book on Open Library
     try:
+        # Map language selection to ISO 639-2 code
+        language_map = {
+            "Polish": "pol",
+            "English": "eng",
+            "Any": None
+        }
+
         search_results = books_service.search_book(
             query,
+            language=language_map[language],
             search_type=search_type_map[search_type]
         )
 
@@ -122,14 +139,13 @@ def add_book(books_service, notion_service):
         # Let user select from matching results
         book_choices = []
         for book in search_results:
-            # Check if the result has the expected structure
-            volume_info = book.get('volumeInfo', {})
-            title = volume_info.get('title', 'Unknown')
-            authors = volume_info.get('authors', [])
+            # Format the book information for display
+            title = book.get('title', 'Unknown')
+            authors = book.get('authors', [])
             author_text = ', '.join(authors) if authors else 'Unknown'
-            published_date = volume_info.get('publishedDate', 'Unknown')
+            published_year = book.get('first_publish_year', 'Unknown')
 
-            book_choices.append(f"{title} by {author_text} ({published_date})")
+            book_choices.append(f"{title} by {author_text} ({published_year})")
         book_choices.append("Cancel")
 
         selected = questionary.select(
@@ -146,7 +162,7 @@ def add_book(books_service, notion_service):
 
         # Get detailed book information
         console.print("[blue]Retrieving detailed book information...[/blue]")
-        book_details = books_service.get_book_full_details(selected_book['id'])
+        book_details = books_service.get_book_details(selected_book['id'])
 
         if not book_details:
             console.print("[yellow]Could not retrieve detailed information for this book.[/yellow]")
@@ -155,32 +171,33 @@ def add_book(books_service, notion_service):
         # Extract information from the details
         title = book_details.get('title')
         authors = book_details.get('authors', [])
-        image_url = book_details.get('image_url')
-        published_date = book_details.get('published_date')
+        cover_url = book_details.get('cover_url')
+        published_year = book_details.get('first_publish_year')
         description = book_details.get('description')
         page_count = book_details.get('page_count')
-        publisher = book_details.get('publisher')
-        categories = book_details.get('categories', [])
-        isbn_13 = book_details.get('isbn_13')
-        isbn_10 = book_details.get('isbn_10')
-        info_link = book_details.get('info_link')
-        language = book_details.get('language')
+        publishers = book_details.get('publishers', [])
+        publisher = publishers[0] if publishers else None
+        subjects = book_details.get('subjects', [])
+        isbn = book_details.get('isbn', [])
+        isbn_13 = isbn[0] if isbn and len(isbn) > 0 else None
+        languages = book_details.get('languages', [])
+        language = languages[0] if languages else None
+        links = book_details.get('links', [])
+        info_link = links[0].get('url') if links else None
 
         # Display detailed book information
         console.print(f"[green]Selected: [bold]{title}[/bold][/green]")
         console.print(f"[cyan]Authors:[/cyan] {', '.join(authors)}")
-        if published_date:
-            console.print(f"[cyan]Published:[/cyan] {published_date}")
+        if published_year:
+            console.print(f"[cyan]Published:[/cyan] {published_year}")
         if publisher:
             console.print(f"[cyan]Publisher:[/cyan] {publisher}")
         if page_count:
             console.print(f"[cyan]Pages:[/cyan] {page_count}")
         if isbn_13:
             console.print(f"[cyan]ISBN-13:[/cyan] {isbn_13}")
-        if isbn_10:
-            console.print(f"[cyan]ISBN-10:[/cyan] {isbn_10}")
-        if categories:
-            console.print(f"[cyan]Categories:[/cyan] {', '.join(categories)}")
+        if subjects:
+            console.print(f"[cyan]Categories:[/cyan] {', '.join(subjects[:3])}")
         if language:
             console.print(f"[cyan]Language:[/cyan] {language.upper()}")
 
@@ -221,44 +238,15 @@ def add_book(books_service, notion_service):
             default="Physical"
         ).ask()
 
-        # Choose cover size
-        cover_size_choices = [
-            "Large",
-            "Medium",
-            "Small",
-            "No Cover"
-        ]
-
-        cover_size = questionary.select(
-            "Cover image size:",
-            choices=cover_size_choices,
-            default="Large"
-        ).ask()
-
-        # Get appropriate cover URL based on selection
-        cover_url = None
+        # Zawsze używamy największej dostępnej okładki
+        cover_url = book_details.get("cover_url")
         icon_url = None
 
-        if cover_size != "No Cover" and "image_urls" in book_details:
-            size_map = {
-                "Large": "large",
-                "Medium": "medium",
-                "Small": "small"
-            }
-
-            # Try to get the selected size
-            api_size = size_map.get(cover_size, "large")
-            if api_size in book_details.get("image_urls", {}):
-                cover_url = book_details["image_urls"][api_size]
-            else:
-                # Fall back to default image URL
-                cover_url = image_url
-
-            # Use a smaller image for the icon
-            if "thumbnail" in book_details.get("image_urls", {}):
-                icon_url = book_details["image_urls"]["thumbnail"]
-            else:
-                icon_url = cover_url
+        # Użyj mniejszej okładki jako ikony
+        if "small" in book_details.get("cover_urls", {}):
+            icon_url = book_details["cover_urls"]["small"]
+        else:
+            icon_url = cover_url
 
         # Add to Notion
         console.print("[blue]Adding book to Notion...[/blue]")
@@ -268,13 +256,13 @@ def add_book(books_service, notion_service):
             authors=authors,
             icon_url=icon_url,
             poster_url=cover_url,
-            published_date=published_date,
+            published_date=published_year,
             status=status,
             format_type=format_type,
             page_count=page_count,
             publisher=publisher,
             description=description,
-            categories=categories,
+            categories=subjects[:5] if subjects else [],
             isbn=isbn_13,
             info_link=info_link
         )
