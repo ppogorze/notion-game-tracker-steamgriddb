@@ -68,7 +68,7 @@ class ConfigManager:
         Check if all required configuration settings are present.
 
         Args:
-            config_type (str): Type of configuration to check ('games' or 'anime')
+            config_type (str): Type of configuration to check ('games', 'anime', or 'books')
 
         Returns:
             bool: True if all required settings are present, False otherwise
@@ -86,6 +86,8 @@ class ConfigManager:
             ])
         elif config_type == 'anime':
             required_settings.append('anime_database_id')
+        elif config_type == 'books':
+            required_settings.append('books_database_id')
 
         for setting in required_settings:
             if setting not in config or not config[setting]:

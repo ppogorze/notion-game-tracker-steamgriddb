@@ -1,6 +1,7 @@
 {
   "games_database_id": "",
   "anime_database_id": "",
+  "books_database_id": "",
   "notion_token": "",
   "steamgriddb_api_key": ""
 }
