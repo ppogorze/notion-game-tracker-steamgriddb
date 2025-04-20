@@ -3,7 +3,6 @@ Notion Service - Handles interaction with the Notion API
 """
 
 import re
-import requests
 from urllib.parse import urlparse
 from notion_client import Client
 from rich.console import Console
@@ -648,12 +647,17 @@ class NotionService:
                         ]
                     }
 
-            # Add studio if provided (single-select)
+            # Add studio if provided (multi-select)
             if studio:
+                if isinstance(studio, list):
+                    # If studio is already a list, use it directly
+                    studio_items = [{"name": s} for s in studio]
+                else:
+                    # If studio is a string, convert it to a list with one item
+                    studio_items = [{"name": studio}]
+
                 properties["Studio"] = {
-                    "select": {
-                        "name": studio
-                    }
+                    "multi_select": studio_items
                 }
 
             # Add episodes if provided (number)
@@ -668,12 +672,25 @@ class NotionService:
                     "number": seasons
                 }
 
-            # Add airing status if provided (select)
-            if airing_status:
+            # Add airing status if provided (multi-select)
+            if airing_status is not None:
+                # Convert various status strings to either "AIRING" or "ENDED"
+                if isinstance(airing_status, str):
+                    # Map string values to our multi-select options
+                    if airing_status.lower() in ["airing", "currently airing", "not yet aired"]:
+                        airing_value = "AIRING"
+                    else:  # "Finished Airing", "Completed", etc.
+                        airing_value = "ENDED"
+                else:
+                    # Default to "AIRING" if we can't determine
+                    airing_value = "AIRING"
+
                 properties["Airing"] = {
-                    "select": {
-                        "name": airing_status
-                    }
+                    "multi_select": [
+                        {
+                            "name": airing_value
+                        }
+                    ]
                 }
 
             # Add synopsis if provided (rich text)

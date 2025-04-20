@@ -78,10 +78,10 @@ A Python CLI application to manage your game and anime collections by connecting
    - **Name** (title): Anime title
    - **Wydano** (number): Release year
    - **Status** (multi-select): Anime status (Watching, To Watch, Watched, Abandoned)
-   - **Studio** (select): Animation studio
+   - **Studio** (multi-select): Animation studios
    - **Episodes** (number): Number of episodes
    - **Seasons** (number): Number of seasons
-   - **Airing** (select): Airing status (Airing, Finished Airing, etc.)
+   - **Airing** (multi-select): Airing status ("AIRING" or "ENDED")
    - **Synopsis** (rich text): Plot description
    - **MAL** (url): MyAnimeList URL
    - **AniDB** (url): AniDB URL

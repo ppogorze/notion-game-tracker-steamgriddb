@@ -129,7 +129,7 @@ class JikanService:
         result = {
             "title": anime_details.get("title"),
             "episodes": anime_details.get("episodes"),
-            "status": anime_details.get("status"),  # Airing, Finished Airing, etc.
+            "status": anime_details.get("status", ""),  # Airing, Finished Airing, etc.
             "synopsis": anime_details.get("synopsis"),
             "year": anime_details.get("year"),
             "mal_id": anime_details.get("mal_id"),

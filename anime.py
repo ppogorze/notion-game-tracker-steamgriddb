@@ -140,7 +140,7 @@ def add_anime(jikan_service, notion_service):
 
         # Get studio information
         studios = anime_details.get("studios", [])
-        studio = studios[0] if studios else None
+        # Pass the entire studios list to Notion
 
         # Add to Notion
         console.print("[magenta]Adding anime to Notion...[/magenta]")
@@ -167,7 +167,7 @@ def add_anime(jikan_service, notion_service):
             poster_url=image,
             release_year=release_year,
             status=status,
-            studio=studio,
+            studio=studios,
             episodes=episodes,
             seasons=seasons,
             airing_status=airing_status,
