@@ -26,28 +26,28 @@ def main():
         "[italic]Connect your books to Notion[/italic]",
         border_style="blue"
     ))
-    
+
     # Load configuration
     config_manager = ConfigManager()
     config = config_manager.load_config()
-    
+
     # Check if configuration is complete for books
     if not config_manager.is_config_complete(config_type='books'):
         console.print("[yellow]Books configuration is incomplete. Please update settings.[/yellow]")
         if not settings_menu(config_manager):
             console.print("[red]Configuration required to continue.[/red]")
             return
-    
+
     # Initialize services with config
     # Reload config to ensure we have the latest values
     config = config_manager.load_config()
-    
+
     books_service = GoogleBooksService()
     notion_service = NotionService(
         config.get('notion_token', ''),
         config.get('books_database_id', '')
     )
-    
+
     # Main program loop
     while True:
         choice = questionary.select(
@@ -59,7 +59,7 @@ def main():
                 "Exit"
             ]
         ).ask()
-        
+
         if choice == "Add Book":
             add_book(books_service, notion_service)
         elif choice == "View Book Library":
@@ -78,22 +78,47 @@ def main():
 
 def add_book(books_service, notion_service):
     """Handle the book addition workflow."""
-    # Get book title from user
-    book_title = questionary.text("Enter book title:").ask()
-    if not book_title:
-        console.print("[yellow]Book title cannot be empty.[/yellow]")
+    # Choose search type
+    search_type = questionary.select(
+        "Search by:",
+        choices=[
+            "Title",
+            "Author",
+            "ISBN",
+            "Any"
+        ],
+        default="Title"
+    ).ask()
+
+    # Get search query from user
+    query_prompt = f"Enter book {search_type.lower()}:"
+    query = questionary.text(query_prompt).ask()
+
+    if not query:
+        console.print("[yellow]Search query cannot be empty.[/yellow]")
         return
-    
-    console.print(f"[blue]Searching for [bold]{book_title}[/bold] on Google Books...[/blue]")
-    
+
+    console.print(f"[blue]Searching for [bold]{query}[/bold] on Google Books...[/blue]")
+
+    # Map UI search type to API search type
+    search_type_map = {
+        "Title": "title",
+        "Author": "author",
+        "ISBN": "isbn",
+        "Any": "any"
+    }
+
     # Search for the book on Google Books
     try:
-        search_results = books_service.search_book(book_title)
-        
+        search_results = books_service.search_book(
+            query,
+            search_type=search_type_map[search_type]
+        )
+
         if not search_results:
-            console.print("[yellow]No books found matching that title.[/yellow]")
+            console.print(f"[yellow]No books found matching that {search_type.lower()}.[/yellow]")
             return
-        
+
         # Let user select from matching results
         book_choices = []
         for book in search_results:
@@ -103,30 +128,30 @@ def add_book(books_service, notion_service):
             authors = volume_info.get('authors', [])
             author_text = ', '.join(authors) if authors else 'Unknown'
             published_date = volume_info.get('publishedDate', 'Unknown')
-            
+
             book_choices.append(f"{title} by {author_text} ({published_date})")
         book_choices.append("Cancel")
-        
+
         selected = questionary.select(
             "Select a book:",
             choices=book_choices
         ).ask()
-        
+
         if selected == "Cancel":
             return
-        
+
         # Find the selected book in the results
         selected_index = book_choices.index(selected)
         selected_book = search_results[selected_index]
-        
+
         # Get detailed book information
         console.print("[blue]Retrieving detailed book information...[/blue]")
         book_details = books_service.get_book_full_details(selected_book['id'])
-        
+
         if not book_details:
             console.print("[yellow]Could not retrieve detailed information for this book.[/yellow]")
             return
-        
+
         # Extract information from the details
         title = book_details.get('title')
         authors = book_details.get('authors', [])
@@ -137,10 +162,35 @@ def add_book(books_service, notion_service):
         publisher = book_details.get('publisher')
         categories = book_details.get('categories', [])
         isbn_13 = book_details.get('isbn_13')
+        isbn_10 = book_details.get('isbn_10')
         info_link = book_details.get('info_link')
-        
-        console.print(f"[green]Selected: [bold]{title}[/bold] by {', '.join(authors)}[/green]")
-        
+        language = book_details.get('language')
+
+        # Display detailed book information
+        console.print(f"[green]Selected: [bold]{title}[/bold][/green]")
+        console.print(f"[cyan]Authors:[/cyan] {', '.join(authors)}")
+        if published_date:
+            console.print(f"[cyan]Published:[/cyan] {published_date}")
+        if publisher:
+            console.print(f"[cyan]Publisher:[/cyan] {publisher}")
+        if page_count:
+            console.print(f"[cyan]Pages:[/cyan] {page_count}")
+        if isbn_13:
+            console.print(f"[cyan]ISBN-13:[/cyan] {isbn_13}")
+        if isbn_10:
+            console.print(f"[cyan]ISBN-10:[/cyan] {isbn_10}")
+        if categories:
+            console.print(f"[cyan]Categories:[/cyan] {', '.join(categories)}")
+        if language:
+            console.print(f"[cyan]Language:[/cyan] {language.upper()}")
+
+        # Show a preview of the description if available
+        if description:
+            # Truncate description if it's too long
+            max_desc_length = 200
+            short_desc = description[:max_desc_length] + "..." if len(description) > max_desc_length else description
+            console.print(f"[cyan]Description:[/cyan] {short_desc}")
+
         # Prompt for book status
         status_choices = [
             "Reading",
@@ -149,13 +199,13 @@ def add_book(books_service, notion_service):
             "Abandoned",
             "No Status"
         ]
-        
+
         status = questionary.select(
             "Book status:",
             choices=status_choices,
             default="No Status"
         ).ask()
-        
+
         # Prompt for book format
         format_choices = [
             "Physical",
@@ -164,21 +214,60 @@ def add_book(books_service, notion_service):
             "Digital (Other)",
             "Audiobook"
         ]
-        
+
         format_type = questionary.select(
             "Book format:",
             choices=format_choices,
             default="Physical"
         ).ask()
-        
+
+        # Choose cover size
+        cover_size_choices = [
+            "Large",
+            "Medium",
+            "Small",
+            "No Cover"
+        ]
+
+        cover_size = questionary.select(
+            "Cover image size:",
+            choices=cover_size_choices,
+            default="Large"
+        ).ask()
+
+        # Get appropriate cover URL based on selection
+        cover_url = None
+        icon_url = None
+
+        if cover_size != "No Cover" and "image_urls" in book_details:
+            size_map = {
+                "Large": "large",
+                "Medium": "medium",
+                "Small": "small"
+            }
+
+            # Try to get the selected size
+            api_size = size_map.get(cover_size, "large")
+            if api_size in book_details.get("image_urls", {}):
+                cover_url = book_details["image_urls"][api_size]
+            else:
+                # Fall back to default image URL
+                cover_url = image_url
+
+            # Use a smaller image for the icon
+            if "thumbnail" in book_details.get("image_urls", {}):
+                icon_url = book_details["image_urls"]["thumbnail"]
+            else:
+                icon_url = cover_url
+
         # Add to Notion
         console.print("[blue]Adding book to Notion...[/blue]")
-        
+
         notion_service.add_book(
             title=title,
             authors=authors,
-            icon_url=image_url,
-            poster_url=image_url,
+            icon_url=icon_url,
+            poster_url=cover_url,
             published_date=published_date,
             status=status,
             format_type=format_type,
@@ -189,9 +278,9 @@ def add_book(books_service, notion_service):
             isbn=isbn_13,
             info_link=info_link
         )
-        
+
         console.print(f"[green]✓ Added [bold]{title}[/bold] to Notion database[/green]")
-    
+
     except Exception as e:
         console.print(f"[red]Error: {str(e)}[/red]")
 
@@ -201,31 +290,31 @@ def settings_menu(config_manager):
         "[bold]Settings[/bold]",
         border_style="blue"
     ))
-    
+
     # Load current config
     config = config_manager.load_config()
-    
+
     # Update settings
     books_db = questionary.text(
         "Books Notion Database ID (or full URL):",
         default=config.get('books_database_id', '')
     ).ask()
-    
+
     notion_token = questionary.text(
         "Notion Integration Secret:",
         default=config.get('notion_token', '')
     ).ask()
-    
+
     # Save new settings
     new_config = config.copy()  # Keep existing settings
     new_config.update({
         'books_database_id': books_db,
         'notion_token': notion_token
     })
-    
+
     config_manager.save_config(new_config)
     console.print("[green]Settings saved successfully![/green]")
-    
+
     # Return True if config is complete for books
     return config_manager.is_config_complete(config_type='books')
 
