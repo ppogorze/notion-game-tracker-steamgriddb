@@ -1,5 +1,5 @@
 """
-Library Manager - Handles the library management UI for games, anime, and books
+Library Manager - Handles the library management UI for games, anime, books, and vinyls
 """
 
 import questionary
@@ -19,16 +19,22 @@ def library_menu(notion_service, media_service=None):
     Returns:
         None
     """
-    # Determine the media type based on the service provided
+    # Determine the media type based on the service provided or parameter
     media_type = "Game"
     border_color = "cyan"
 
-    if hasattr(media_service, 'search_anime'):
+    if media_service == "vinyl":
+        media_type = "Vinyl"
+        border_color = "green"
+    elif hasattr(media_service, 'search_anime'):
         media_type = "Anime"
         border_color = "magenta"
     elif hasattr(media_service, 'search_book'):
         media_type = "Book"
         border_color = "blue"
+    elif hasattr(media_service, 'search_vinyl'):
+        media_type = "Vinyl"
+        border_color = "green"
 
     console.print(Panel.fit(
         f"[bold {border_color}]{media_type} Library Management[/bold {border_color}]",
@@ -80,6 +86,8 @@ def list_all_games(notion_service, start_cursor=None, page_size=10):
             media_type = "anime"
         elif hasattr(notion_service, 'books_database_id') and notion_service.database_id == notion_service.books_database_id:
             media_type = "books"
+        elif hasattr(notion_service, 'vinyls_database_id') and notion_service.database_id == notion_service.vinyls_database_id:
+            media_type = "vinyls"
 
         if not items:
             console.print(f"[yellow]No {media_type} found in your library.[/yellow]")
@@ -138,6 +146,8 @@ def search_games(notion_service):
             media_type = "anime"
         elif hasattr(notion_service, 'books_database_id') and notion_service.database_id == notion_service.books_database_id:
             media_type = "books"
+        elif hasattr(notion_service, 'vinyls_database_id') and notion_service.database_id == notion_service.vinyls_database_id:
+            media_type = "vinyls"
 
         # Search for items
         items = notion_service.search_games(query)
@@ -213,10 +223,14 @@ def edit_game(notion_service, media_service=None):
     try:
         # Determine the media type based on the service
         media_type = "game"
-        if hasattr(media_service, 'search_anime'):
+        if media_service == "vinyl":
+            media_type = "vinyl"
+        elif hasattr(media_service, 'search_anime'):
             media_type = "anime"
         elif hasattr(media_service, 'search_book'):
             media_type = "book"
+        elif hasattr(media_service, 'search_vinyl'):
+            media_type = "vinyl"
 
         # Get first page of items
         items, _ = notion_service.list_games(limit=50)
@@ -264,14 +278,26 @@ def edit_specific_game(notion_service, item, media_service=None):
     current_name = props.get("name", "Unknown")
     current_year = props.get("release_year")
 
+    # Determine the media type based on the service
+    media_type = "Game"
+    if media_service == "vinyl":
+        media_type = "Vinyl"
+    elif hasattr(media_service, 'search_anime'):
+        media_type = "Anime"
+    elif hasattr(media_service, 'search_book'):
+        media_type = "Book"
+    elif hasattr(media_service, 'search_vinyl'):
+        media_type = "Vinyl"
+
     # Ask for new values
     new_name = questionary.text(
-        "Game name:",
+        f"{media_type} name:",
         default=current_name
     ).ask()
 
+    year_label = "Release year" if media_type != "Vinyl" else "Release year"
     new_year_str = questionary.text(
-        "Release year:",
+        f"{year_label}:",
         default=str(current_year) if current_year else ""
     ).ask()
 
@@ -285,40 +311,93 @@ def edit_specific_game(notion_service, item, media_service=None):
 
     # Get current status and prompt for new status
     current_status = props.get("status", "")
-    status_choices = [
-        "Chcę zagrać",
-        "Przestałem grać",
-        "W trakcie",
-        "Ukończone",
-        "No Status"
-    ]
+
+    # Different status choices based on media type
+    if media_type == "Vinyl":
+        status_choices = [
+            "In Collection",
+            "Wishlist",
+            "Sold",
+            "No Status"
+        ]
+    elif media_type == "Anime":
+        status_choices = [
+            "Watching",
+            "To Watch",
+            "Watched",
+            "Abandoned",
+            "No Status"
+        ]
+    elif media_type == "Book":
+        status_choices = [
+            "Reading",
+            "To Read",
+            "Read",
+            "Abandoned",
+            "No Status"
+        ]
+    else:  # Default for games
+        status_choices = [
+            "Chcę zagrać",
+            "Przestałem grać",
+            "W trakcie",
+            "Ukończone",
+            "No Status"
+        ]
 
     new_status = questionary.select(
-        "Game status:",
+        f"{media_type} status:",
         choices=status_choices,
         default=current_status if current_status in status_choices else "No Status"
     ).ask()
 
-    # Get current platform and prompt for new platform
-    current_platform = props.get("platform", "PC")
-    platform_choices = [
-        "PC",
-        "PS4",
-        "PS5",
-        "Switch"
-    ]
+    # Get current platform/format and prompt for new value
+    if media_type == "Vinyl":
+        current_format = props.get("format", "")
+        format_choices = [
+            "LP",
+            "EP",
+            "Single",
+            "Album",
+            "Compilation",
+            "Box Set",
+            "Other"
+        ]
 
-    new_platform = questionary.select(
-        "Game platform:",
-        choices=platform_choices,
-        default=current_platform if current_platform in platform_choices else "PC"
-    ).ask()
+        new_format = questionary.select(
+            "Format:",
+            choices=format_choices,
+            default=current_format if current_format in format_choices else "LP"
+        ).ask()
+        new_platform = None  # Not used for vinyls
+    else:
+        # For games, anime, books
+        current_platform = props.get("platform", "PC")
+        platform_choices = [
+            "PC",
+            "PS4",
+            "PS5",
+            "Switch"
+        ]
+
+        new_platform = questionary.select(
+            f"{media_type} platform:",
+            choices=platform_choices,
+            default=current_platform if current_platform in platform_choices else "PC"
+        ).ask()
+        new_format = None  # Not used for games, anime, books
 
     # Determine what has changed
     name_changed = new_name and new_name != current_name
     year_changed = new_year and new_year != current_year
     status_changed = new_status != current_status
-    platform_changed = new_platform != current_platform
+
+    if media_type == "Vinyl":
+        format_changed = new_format != current_format
+        platform_changed = False  # Not used for vinyls
+    else:
+        platform_changed = new_platform != current_platform
+        format_changed = False  # Not used for games, anime, books
 
     # Determine if we can update assets based on the media service type
     update_assets = False
@@ -408,19 +487,30 @@ def edit_specific_game(notion_service, item, media_service=None):
                 console.print("[yellow]No games found on SteamGridDB. Assets won't be updated.[/yellow]")
                 update_assets = False
 
-    # Update the game if anything has changed
-    if name_changed or year_changed or status_changed or platform_changed or update_assets:
+    # Update the item if anything has changed
+    if name_changed or year_changed or status_changed or platform_changed or format_changed or update_assets:
         console.print("[cyan]Updating game in Notion...[/cyan]")
 
-        success = notion_service.update_game(
-            page_id=item_id,
-            name=new_name if name_changed else None,
-            release_year=new_year if year_changed else None,
-            status=new_status if status_changed else None,
-            platform=new_platform if platform_changed else None,
-            icon_url=new_icon,
-            poster_url=new_poster
-        )
+        if media_type == "Vinyl":
+            success = notion_service.update_game(
+                page_id=item_id,
+                name=new_name if name_changed else None,
+                release_year=new_year if year_changed else None,
+                status=new_status if status_changed else None,
+                format_type=new_format if format_changed else None,  # Use format for vinyls
+                icon_url=new_icon,
+                poster_url=new_poster
+            )
+        else:
+            success = notion_service.update_game(
+                page_id=item_id,
+                name=new_name if name_changed else None,
+                release_year=new_year if year_changed else None,
+                status=new_status if status_changed else None,
+                platform=new_platform if platform_changed else None,  # Use platform for games, anime, books
+                icon_url=new_icon,
+                poster_url=new_poster
+            )
 
         if success:
             console.print(f"[green]✓ Updated [bold]{new_name if name_changed else current_name}[/bold][/green]")
@@ -446,6 +536,8 @@ def delete_game(notion_service):
             media_type = "anime"
         elif hasattr(notion_service, 'books_database_id') and notion_service.database_id == notion_service.books_database_id:
             media_type = "book"
+        elif hasattr(notion_service, 'vinyls_database_id') and notion_service.database_id == notion_service.vinyls_database_id:
+            media_type = "vinyl"
 
         # Get first page of items
         items, _ = notion_service.list_games(limit=50)

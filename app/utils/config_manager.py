@@ -88,6 +88,8 @@ class ConfigManager:
             required_settings.append('anime_database_id')
         elif config_type == 'books':
             required_settings.append('books_database_id')
+        elif config_type == 'vinyls':
+            required_settings.append('vinyls_database_id')
 
         for setting in required_settings:
             if setting not in config or not config[setting]:

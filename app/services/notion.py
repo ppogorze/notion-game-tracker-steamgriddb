@@ -233,18 +233,19 @@ class NotionService:
             console.print(f"[red]Error retrieving game: {str(e)}[/red]")
             return None
 
-    def update_game(self, page_id, name=None, release_year=None, icon_url=None, poster_url=None, status=None, platform=None):
+    def update_game(self, page_id, name=None, release_year=None, icon_url=None, poster_url=None, status=None, platform=None, format_type=None):
         """
-        Update an existing game in the Notion database.
+        Update an existing item in the Notion database.
 
         Args:
             page_id (str): Notion page ID
-            name (str, optional): New game name
+            name (str, optional): New item name
             release_year (int, optional): New release year
             icon_url (str, optional): New icon URL
             poster_url (str, optional): New poster URL
-            status (str, optional): Game status (multi-select in Notion)
+            status (str, optional): Item status (multi-select in Notion)
             platform (str, optional): Game platform (single-select in Notion)
+            format_type (str, optional): Format type (for vinyl records, books)
 
         Returns:
             bool: True if updated successfully, False otherwise
@@ -299,6 +300,14 @@ class NotionService:
                 properties["Platforma"] = {
                     "select": {
                         "name": platform
+                    }
+                }
+
+            # Update format if provided
+            if format_type is not None:
+                properties["Format"] = {
+                    "select": {
+                        "name": format_type
                     }
                 }
 
@@ -909,6 +918,271 @@ class NotionService:
                         {
                             "text": {
                                 "content": isbn
+                            }
+                        }
+                    ]
+                }
+
+            # Add info link if provided (rich_text)
+            if info_link:
+                properties["Info"] = {
+                    "rich_text": [
+                        {
+                            "text": {
+                                "content": info_link
+                            }
+                        }
+                    ]
+                }
+
+            # Create the basic page
+            page_data = {
+                "parent": {
+                    "database_id": self.database_id
+                },
+                "properties": properties
+            }
+
+            # Add icon if provided
+            if icon_url:
+                page_data["icon"] = {
+                    "type": "external",
+                    "external": {
+                        "url": icon_url
+                    }
+                }
+
+            # Add cover if provided
+            if poster_url:
+                page_data["cover"] = {
+                    "type": "external",
+                    "external": {
+                        "url": poster_url
+                    }
+                }
+
+            # Create the page in Notion
+            response = self.client.pages.create(**page_data)
+
+            # Return True if the page was created successfully
+            return "id" in response
+
+        except Exception as e:
+            console.print(f"[red]Notion API Error: {str(e)}[/red]")
+            return False
+
+    def add_vinyl(self, title, artist=None, icon_url=None, poster_url=None, release_year=None,
+                 status=None, format_type=None, label=None, genre=None, tracklist=None,
+                 notes=None, country=None, info_link=None):
+        """
+        Add a vinyl record to the Notion database.
+
+        Args:
+            title (str): Album title
+            artist (list, optional): List of artists. Defaults to None.
+            icon_url (str, optional): URL of the vinyl icon. Defaults to None.
+            poster_url (str, optional): URL of the vinyl cover. Defaults to None.
+            release_year (int, optional): Year of release. Defaults to None.
+            status (str, optional): Vinyl status (multi-select in Notion). Defaults to None.
+            format_type (str, optional): Vinyl format (select in Notion). Defaults to None.
+            label (list, optional): List of record labels. Defaults to None.
+            genre (list, optional): List of genres. Defaults to None.
+            tracklist (list, optional): List of tracks. Defaults to None.
+            notes (str, optional): Additional notes. Defaults to None.
+            country (str, optional): Country of release. Defaults to None.
+            info_link (str, optional): Link to more information. Defaults to None.
+
+        Returns:
+            bool: True if the vinyl was added successfully, False otherwise
+        """
+        if not self.client:
+            raise ValueError("Notion token is not set")
+
+        if not self.database_id:
+            raise ValueError("Notion database ID is not set")
+
+        try:
+            # Create the page properties
+            properties = {
+                "Name": {
+                    "title": [
+                        {
+                            "text": {
+                                "content": title
+                            }
+                        }
+                    ]
+                }
+            }
+
+            # Add artist if provided (multi-select)
+            if artist:
+                # Convert artists to multi-select items
+                artist_items = []
+                if isinstance(artist, list):
+                    for a in artist:
+                        artist_items.append({"name": a})
+                else:
+                    # If it's a string, split by commas
+                    artist_list = [a.strip() for a in artist.split(",")]
+                    for a in artist_list:
+                        if a:  # Only add non-empty artists
+                            artist_items.append({"name": a})
+
+                properties["Artist"] = {
+                    "multi_select": artist_items
+                }
+
+            # Add release year if provided (as text in select field)
+            if release_year:
+                # Convert to string
+                year_str = str(release_year)
+
+                properties["Released"] = {
+                    "rich_text": [
+                        {
+                            "text": {
+                                "content": year_str
+                            }
+                        }
+                    ]
+                }
+
+            # Add status if provided
+            if status:
+                if status.lower() == "no status":
+                    # Empty multi-select (clear status)
+                    properties["Status"] = {
+                        "multi_select": []
+                    }
+                else:
+                    # Add single status as multi-select
+                    properties["Status"] = {
+                        "multi_select": [
+                            {
+                                "name": status
+                            }
+                        ]
+                    }
+
+            # Add format type if provided (multi_select or as text)
+            if format_type:
+                # Convert format to multi-select items or use as text
+                format_items = []
+                if isinstance(format_type, list):
+                    for f in format_type:
+                        format_items.append({"name": f})
+                else:
+                    # If it's a string, split by commas
+                    format_list = [f.strip() for f in format_type.split(",")]
+                    for f in format_list:
+                        if f:  # Only add non-empty formats
+                            format_items.append({"name": f})
+
+                # If we have format items, add them as multi-select
+                if format_items:
+                    properties["Format"] = {
+                        "rich_text": [
+                            {
+                                "text": {
+                                    "content": format_type if isinstance(format_type, str) else ", ".join(format_type) if isinstance(format_type, list) else ""
+                                }
+                            }
+                        ]
+                    }
+                else:
+                    # Fallback to text if no items
+                    properties["Format"] = {
+                        "rich_text": [
+                            {
+                                "text": {
+                                    "content": str(format_type)
+                                }
+                            }
+                        ]
+                    }
+
+            # Add label if provided (multi-select)
+            if label:
+                # Convert labels to multi-select items
+                label_items = []
+                if isinstance(label, list):
+                    for l in label:
+                        label_items.append({"name": l})
+                else:
+                    # If it's a string, split by commas
+                    label_list = [l.strip() for l in label.split(",")]
+                    for l in label_list:
+                        if l:  # Only add non-empty labels
+                            label_items.append({"name": l})
+
+                properties["Label"] = {
+                    "multi_select": label_items
+                }
+
+            # Add genre if provided (multi-select)
+            if genre:
+                # Convert genres to multi-select items
+                genre_items = []
+                if isinstance(genre, list):
+                    for g in genre:
+                        genre_items.append({"name": g})
+                else:
+                    # If it's a string, split by commas
+                    genre_list = [g.strip() for g in genre.split(",")]
+                    for g in genre_list:
+                        if g:  # Only add non-empty genres
+                            genre_items.append({"name": g})
+
+                properties["Genre"] = {
+                    "multi_select": genre_items
+                }
+
+            # Add country if provided (as text)
+            if country:
+                properties["Country"] = {
+                    "rich_text": [
+                        {
+                            "text": {
+                                "content": country
+                            }
+                        }
+                    ]
+                }
+
+            # Add notes if provided (rich text)
+            if notes:
+                properties["Notes"] = {
+                    "rich_text": [
+                        {
+                            "text": {
+                                "content": notes
+                            }
+                        }
+                    ]
+                }
+
+            # Add tracklist if provided (rich text)
+            if tracklist:
+                # Convert tracklist to string
+                tracklist_text = ""
+                if isinstance(tracklist, list):
+                    for track in tracklist:
+                        if isinstance(track, dict):
+                            position = track.get("position", "")
+                            title = track.get("title", "")
+                            duration = track.get("duration", "")
+                            tracklist_text += f"{position}. {title} ({duration})\n"
+                        else:
+                            tracklist_text += f"{track}\n"
+                else:
+                    tracklist_text = tracklist
+
+                properties["Tracklist"] = {
+                    "rich_text": [
+                        {
+                            "text": {
+                                "content": tracklist_text
                             }
                         }
                     ]
